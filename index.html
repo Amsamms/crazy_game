@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chromatic Surge</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="hud" id="hud">
+        <div class="hud-block">
+            <span class="label">Score</span>
+            <span class="value" id="scoreValue">0</span>
+        </div>
+        <div class="hud-block">
+            <span class="label">Combo</span>
+            <span class="value" id="comboValue">1x</span>
+        </div>
+        <div class="hud-block">
+            <span class="label">Lives</span>
+            <span class="value" id="livesValue">3</span>
+        </div>
+        <div class="hud-block">
+            <span class="label">Level</span>
+            <span class="value" id="levelValue">1</span>
+        </div>
+        <div class="hud-block hud-action">
+            <button class="hud-button" id="audioToggle" aria-pressed="false" title="Toggle sound">Sound On</button>
+        </div>
+    </div>
+
+    <canvas id="game"></canvas>
+
+    <div class="overlay" id="startMenu">
+        <div class="panel">
+            <h1>Chromatic Surge</h1>
+            <p>Ride the neon wave. Gather energy, dodge glitch shards, unleash chroma bursts.</p>
+            <ul>
+                <li>Move with WASD or Arrow Keys</li>
+                <li>Hold Shift to Drift</li>
+                <li>Collect energy orbs to raise your combo multiplier</li>
+                <li>Dodge the glitch shards or pop them with a shield</li>
+            </ul>
+            <button id="startButton">Enter the Surge</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="gameOverMenu" hidden>
+        <div class="panel">
+            <h2>Game Over</h2>
+            <p id="finalScore">Score: 0</p>
+            <p id="bestScore">Best: 0</p>
+            <button id="restartButton">Surge Again</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
