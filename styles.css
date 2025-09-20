@@ -17,6 +17,8 @@ body {
     background: radial-gradient(circle at center, #1b1d3c 0%, #050513 70%, #03020a 100%);
     overflow: hidden;
     height: 100vh;
+    min-height: 100dvh;
+    -webkit-tap-highlight-color: transparent;
 }
 
 body::before,
@@ -51,6 +53,7 @@ canvas#game {
     left: 0;
     width: 100vw;
     height: 100vh;
+    touch-action: none;
 }
 
 .hud {
@@ -207,6 +210,11 @@ button:hover {
     box-shadow: 0 20px 60px rgba(255, 62, 252, 0.35);
 }
 
+button,
+.hud-button {
+    touch-action: manipulation;
+}
+
 button:active {
     transform: translateY(2px);
 }
@@ -231,5 +239,46 @@ button:active {
 
     .panel ul {
         font-size: 0.95rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .hud {
+        gap: 12px;
+        padding: 8px 12px;
+        bottom: 16px;
+    }
+
+    .hud-block {
+        width: 54px;
+    }
+
+    .label {
+        font-size: 0.65rem;
+    }
+
+    .value {
+        font-size: 1.15rem;
+    }
+
+    button,
+    .hud-button {
+        font-size: 0.95rem;
+        padding: 12px 26px;
+    }
+
+    .panel {
+        margin: 16px;
+        padding: 24px 20px;
+    }
+
+    .panel h1,
+    .panel h2 {
+        font-size: 1.9rem;
+        letter-spacing: 3px;
+    }
+
+    .panel ul {
+        font-size: 0.9rem;
     }
 }
