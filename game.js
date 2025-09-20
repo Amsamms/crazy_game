@@ -40,6 +40,9 @@
         level: 1,
         shieldTimer: 0,
         slowTimer: 0,
+        godMode: false,
+        godTapCount: 0,
+        godTapTimer: 0,
         hazardInterval: 2.3,
         orbInterval: 0.75,
         shake: 0,
@@ -53,6 +56,7 @@
     };
 
     const input = { up: false, down: false, left: false, right: false, shift: false };
+    const pointerControl = { active: false, pointerId: null, x: 0, y: 0 };
 
     const orbs = [];
     const hazards = [];
@@ -62,6 +66,7 @@
     let lastTime = 0;
     let pixelRatio = window.devicePixelRatio || 1;
     let hudDirty = true;
+    let lastPointerTapTime = 0;
 
     const audio = (() => {
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -544,6 +549,9 @@
         state.level = 1;
         state.shieldTimer = 0;
         state.slowTimer = 0;
+        state.godMode = false;
+        state.godTapCount = 0;
+        state.godTapTimer = 0;
         state.hazardInterval = 2.3;
         state.orbInterval = 0.75;
         state.shake = 0;
@@ -556,6 +564,9 @@
         hazards.length = 0;
         powerUps.length = 0;
         particles.length = 0;
+
+        pointerControl.active = false;
+        pointerControl.pointerId = null;
 
         player.x = state.width / 2;
         player.y = state.height / 2;
@@ -689,15 +700,39 @@
         });
     }
 
+    function activateGodMode() {
+        if (state.godMode) return;
+        state.godMode = true;
+        state.godTapCount = 0;
+        state.godTapTimer = 0;
+        state.shieldTimer = Math.max(state.shieldTimer, 4);
+        pushBurst(player.x, player.y, player.hue, 48);
+        audio.playPower();
+        state.shake = Math.max(state.shake, 12);
+    }
+
     function updatePlayer(dt) {
-        const accel = input.shift ? 380 : 540;
-        const maxSpeed = input.shift ? 340 : 460;
-        const friction = input.shift ? 0.86 : 0.82;
+        let accel = input.shift ? 380 : 540;
+        let maxSpeed = input.shift ? 340 : 460;
+        let friction = input.shift ? 0.86 : 0.82;
+
+        if (state.godMode) {
+            accel *= 1.45;
+            maxSpeed *= 1.55;
+            friction = input.shift ? 0.9 : 0.88;
+        }
 
         if (input.up) player.vy -= accel * dt;
         if (input.down) player.vy += accel * dt;
         if (input.left) player.vx -= accel * dt;
         if (input.right) player.vx += accel * dt;
+
+        if (pointerControl.active) {
+            const pointerStrength = state.godMode ? 0.06 : 0.045;
+            const normalizer = Math.min(dt * 60, 2);
+            player.vx += (pointerControl.x - player.x) * pointerStrength * normalizer;
+            player.vy += (pointerControl.y - player.y) * pointerStrength * normalizer;
+        }
 
         player.vx *= friction;
         player.vy *= friction;
@@ -784,6 +819,14 @@
 
             const combined = player.radius + hazard.size * 0.45;
             if (distSq(player, hazard) < combined * combined) {
+                if (state.godMode) {
+                    pushBurst(hazard.x, hazard.y, player.hue, 24);
+                    hazards.splice(i, 1);
+                    state.shake = Math.max(state.shake, 6);
+                    player.vx *= 1.05;
+                    player.vy *= 1.05;
+                    continue;
+                }
                 if (state.shieldTimer > 0) {
                     pushBurst(hazard.x, hazard.y, hazard.hue, 36);
                     audio.playShield();
@@ -966,6 +1009,20 @@
             ctx.arc(player.x, player.y, player.radius + 16 + Math.sin(state.time * 6) * 2, 0, Math.PI * 2);
             ctx.stroke();
         }
+        if (state.godMode) {
+            const auraPulse = 0.45 + Math.sin(state.time * 6) * 0.15;
+            ctx.beginPath();
+            ctx.strokeStyle = `hsla(${player.hue}, 100%, 85%, ${auraPulse})`;
+            ctx.lineWidth = 6;
+            ctx.arc(player.x, player.y, player.radius + 28 + Math.sin(state.time * 3) * 3, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = `hsla(${player.hue + 80}, 100%, 70%, ${auraPulse * 0.6})`;
+            ctx.lineWidth = 2;
+            ctx.arc(player.x, player.y, player.radius + 42 + Math.sin(state.time * 5) * 4, 0, Math.PI * 2);
+            ctx.stroke();
+        }
     }
 
     function updateTimers(dt) {
@@ -1008,6 +1065,13 @@
             state.slowTimer -= dt;
             if (state.slowTimer < 0) state.slowTimer = 0;
         }
+        if (!state.godMode && state.godTapCount > 0) {
+            state.godTapTimer -= dt;
+            if (state.godTapTimer <= 0) {
+                state.godTapCount = 0;
+                state.godTapTimer = 0;
+            }
+        }
     }
 
     function loop(timestamp) {
@@ -1037,6 +1101,52 @@
         ctx.restore();
 
         requestAnimationFrame(loop);
+    }
+
+    function getPointerPosition(event) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top
+        };
+    }
+
+    function nudgeTowardsPoint(x, y, multiplier = 0.02) {
+        const dx = x - player.x;
+        const dy = y - player.y;
+        const boost = state.godMode ? 1.4 : 1;
+        player.vx += dx * multiplier * boost;
+        player.vy += dy * multiplier * boost;
+    }
+
+    function handleGodTap(x, y) {
+        if (!state.playing || state.godMode) return;
+        const radius = player.radius + 24;
+        const dx = x - player.x;
+        const dy = y - player.y;
+        if (dx * dx + dy * dy <= radius * radius) {
+            state.godTapCount += 1;
+            state.godTapTimer = 1.3;
+            if (state.godTapCount >= 8) {
+                activateGodMode();
+            }
+        } else {
+            state.godTapCount = 0;
+            state.godTapTimer = 0;
+        }
+    }
+
+    function endPointerControl(event) {
+        if (!pointerControl.active || pointerControl.pointerId !== event.pointerId) {
+            return;
+        }
+        pointerControl.active = false;
+        pointerControl.pointerId = null;
+        try {
+            canvas.releasePointerCapture(event.pointerId);
+        } catch (error) {
+            // ignore environments without pointer capture support
+        }
     }
 
     window.addEventListener("keydown", (event) => {
@@ -1101,15 +1211,58 @@
         }
     });
 
-    canvas.addEventListener("mousemove", (event) => {
+    canvas.addEventListener("pointerdown", (event) => {
         if (!state.playing) return;
-        const rect = canvas.getBoundingClientRect();
-        const targetX = event.clientX - rect.left;
-        const targetY = event.clientY - rect.top;
-        const dx = targetX - player.x;
-        const dy = targetY - player.y;
-        player.vx += dx * 0.02;
-        player.vy += dy * 0.02;
+        event.preventDefault();
+        const { x, y } = getPointerPosition(event);
+        pointerControl.active = true;
+        pointerControl.pointerId = event.pointerId;
+        pointerControl.x = x;
+        pointerControl.y = y;
+        try {
+            canvas.setPointerCapture(event.pointerId);
+        } catch (error) {
+            // pointer capture is optional; ignore failures
+        }
+        nudgeTowardsPoint(x, y, state.godMode ? 0.035 : 0.025);
+        handleGodTap(x, y);
+        lastPointerTapTime = performance.now();
+    });
+
+    canvas.addEventListener("pointermove", (event) => {
+        if (!pointerControl.active || pointerControl.pointerId !== event.pointerId) return;
+        if (!state.playing) return;
+        event.preventDefault();
+        const { x, y } = getPointerPosition(event);
+        pointerControl.x = x;
+        pointerControl.y = y;
+    });
+
+    canvas.addEventListener("pointerup", (event) => {
+        endPointerControl(event);
+    });
+
+    canvas.addEventListener("pointercancel", (event) => {
+        endPointerControl(event);
+    });
+
+    canvas.addEventListener("pointerleave", (event) => {
+        endPointerControl(event);
+    });
+
+    canvas.addEventListener("mousemove", (event) => {
+        if (!state.playing || pointerControl.active) return;
+        const { x, y } = getPointerPosition(event);
+        nudgeTowardsPoint(x, y, state.godMode ? 0.03 : 0.02);
+    });
+
+    canvas.addEventListener("click", (event) => {
+        if (!state.playing) return;
+        if (performance.now() - lastPointerTapTime < 250) {
+            return;
+        }
+        const { x, y } = getPointerPosition(event);
+        handleGodTap(x, y);
     });
 
     startButton.addEventListener("click", () => {
